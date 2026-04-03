@@ -1,3 +1,22 @@
+# macOS
+.DS_Store
+
+# Data files
 data/raw/
 data/processed/
+
+# Model artifacts
 models/*.pkl
+
+# MLflow
+mlruns/
+mlflow.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
