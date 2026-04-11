@@ -30,8 +30,16 @@ RANDOM_STATE = 42
 
 def load_data(data_dir):
     # Load the dataset
+    if not data_dir.exists():
+        logger.error(f"Data directory {data_dir} does not exist.")
+        raise FileNotFoundError(f"Data directory {data_dir} does not exist.")
     
+    logger.info(f"Loading data from {data_dir}...")
     csv_files = list(data_dir.glob("*.csv")) # List all CSV files in the raw data directory
+    if not csv_files:
+        logger.error(f"No CSV files found in {data_dir}.")
+        raise FileNotFoundError(f"No CSV files found in {data_dir}.")
+        
     logger.info(f"Found {len(csv_files)} CSV files in {data_dir}")
     dataframes = []
     for csv_file in csv_files:
@@ -114,8 +122,15 @@ def fit_encoder(network_data, label_column):
     label_encoder_production = LabelEncoder()
     network_data[label_column] = label_encoder_production.fit_transform(network_data[label_column])
     logger.info("Fitted label encoder to categorical column.")
+
+    if not MODELS_DIR.exists(): # Ensure the models directory exists before saving the label encoder
+        MODELS_DIR.mkdir(parents=True)
+        logger.info(f"Created models directory at {MODELS_DIR}")
+
     joblib.dump(label_encoder_production, MODELS_DIR / "label_encoder_production.joblib")
     logger.info(f"Saved label encoder to {MODELS_DIR / 'label_encoder_production.joblib'}")
+    
+    
     return network_data
 
 def train_test_split_data(network_data,  label_column, test_size, random_state):
@@ -138,6 +153,15 @@ def scale_features(X_train, X_test):
     X_train_scaled_production = network_data_scaler_production.fit_transform(X_train)
     X_test_scaled_production = network_data_scaler_production.transform(X_test)
     logger.info("Scaled training and testing features using the scaler pipeline.")
+
+    if not MODELS_DIR.exists(): # Ensure the models directory exists before saving the scaler pipeline
+        MODELS_DIR.mkdir(parents=True)
+        logger.info(f"Created models directory at {MODELS_DIR}")
+    
+    if not PROCESSED_DATA_DIR.exists(): # Ensure the processed data directory exists before saving scaled features
+        PROCESSED_DATA_DIR.mkdir(parents=True)
+        logger.info(f"Created processed data directory at {PROCESSED_DATA_DIR}")
+
     joblib.dump(network_data_scaler_production, MODELS_DIR / "network_data_scaler_production.joblib")
     logger.info(f"Saved feature scaler pipeline to {MODELS_DIR / 'network_data_scaler_production.joblib'}")
     np.save(PROCESSED_DATA_DIR / "X_train_scaled_production.npy", X_train_scaled_production)
