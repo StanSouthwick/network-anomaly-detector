@@ -4,7 +4,6 @@ import logging
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 import joblib
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
 import numpy as np
 
 # log1p transformation removed — primary model (XGBoost) is tree-based and 
@@ -96,20 +95,15 @@ def drop_zero_variance(network_data):
 
 
 def drop_highly_correlated(network_data, threshold):
-    correlations = network_data.select_dtypes(include='number').corr() # Calculate the correlation matrix for numeric columns
-    # Identify pairs of columns with high correlation
-    high_corr = (correlations.abs() > threshold) & (correlations.abs() < 1.0)
-    pairs = [(col, row) for col in correlations.columns 
-         for row in correlations.index 
-         if high_corr.loc[row, col] and row < col]
-
-    columns_to_drop = set()
-    # Print the pairs of highly correlated columns
-    for col1, col2 in pairs:
-        if col2 not in columns_to_drop:
-            columns_to_drop.add(col2)
-    logger.info(f"\nColumns to drop due to high correlation: {columns_to_drop}")
+    corr_matrix = network_data.select_dtypes(include='number').corr().abs()
+    upper_triangle = np.triu(corr_matrix, k=1)  # Upper triangle only, excluding diagonal
+    columns_to_drop = [
+        corr_matrix.columns[col_idx]
+        for col_idx in range(upper_triangle.shape[1])
+        if any(upper_triangle[:, col_idx] > threshold)
+    ]
     network_data = network_data.drop(columns=columns_to_drop)
+    logger.info(f"Dropped {len(columns_to_drop)} highly correlated columns: {columns_to_drop}")
     return network_data
 
 def replace_encoding_issues(network_data, label_column, replacements):
@@ -123,9 +117,7 @@ def fit_encoder(network_data, label_column):
     network_data[label_column] = label_encoder_production.fit_transform(network_data[label_column])
     logger.info("Fitted label encoder to categorical column.")
 
-    if not MODELS_DIR.exists(): # Ensure the models directory exists before saving the label encoder
-        MODELS_DIR.mkdir(parents=True)
-        logger.info(f"Created models directory at {MODELS_DIR}")
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
     joblib.dump(label_encoder_production, MODELS_DIR / "label_encoder_production.joblib")
     logger.info(f"Saved label encoder to {MODELS_DIR / 'label_encoder_production.joblib'}")
@@ -134,6 +126,8 @@ def fit_encoder(network_data, label_column):
     return network_data
 
 def train_test_split_data(network_data,  label_column, test_size, random_state):
+
+    PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
     X = network_data.drop(columns=[label_column])
     y = network_data[label_column]
     X_train_production, X_test_production, y_train_production, y_test_production = train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=y)
@@ -146,21 +140,15 @@ def train_test_split_data(network_data,  label_column, test_size, random_state):
     return X_train_production, X_test_production, y_train_production, y_test_production
 
 def scale_features(X_train, X_test):
-    network_data_scaler_production = Pipeline([
-        ('scaler', StandardScaler())
-    ])
+    network_data_scaler_production = StandardScaler()
+    
     logger.info("Initialized feature scaler pipeline.")
     X_train_scaled_production = network_data_scaler_production.fit_transform(X_train)
     X_test_scaled_production = network_data_scaler_production.transform(X_test)
     logger.info("Scaled training and testing features using the scaler pipeline.")
 
-    if not MODELS_DIR.exists(): # Ensure the models directory exists before saving the scaler pipeline
-        MODELS_DIR.mkdir(parents=True)
-        logger.info(f"Created models directory at {MODELS_DIR}")
-    
-    if not PROCESSED_DATA_DIR.exists(): # Ensure the processed data directory exists before saving scaled features
-        PROCESSED_DATA_DIR.mkdir(parents=True)
-        logger.info(f"Created processed data directory at {PROCESSED_DATA_DIR}")
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     joblib.dump(network_data_scaler_production, MODELS_DIR / "network_data_scaler_production.joblib")
     logger.info(f"Saved feature scaler pipeline to {MODELS_DIR / 'network_data_scaler_production.joblib'}")

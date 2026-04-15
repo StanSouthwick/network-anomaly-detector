@@ -7,6 +7,7 @@ from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
+mlflow.set_experiment("network-anomaly-detector")
 
 BASE_DIR = Path(__file__).parent.parent
 MODELS_DIR = BASE_DIR / "models"
@@ -46,25 +47,26 @@ class EnsembleModel:
         return final_predictions
     
     def evaluate(self, y_true, y_pred):
-        conf_report_dict = classification_report(y_true, y_pred, output_dict=True, zero_division=0)
-        conf_report_string = classification_report(y_true, y_pred, output_dict=True, zero_division=0)
+        class_report_dict = classification_report(y_true, y_pred, output_dict=True, zero_division=0)
+        class_report_string = classification_report(y_true, y_pred, output_dict=False, zero_division=0)
         conf_matrix = confusion_matrix(y_true, y_pred)
         f1 = f1_score(y_true, y_pred, average="macro")
-        logger.info("Classification Report:\n" + conf_report_string)
+        logger.info("Classification Report:\n" + class_report_string)
         logger.info("Confusion Matrix:\n" + str(conf_matrix))
         logger.info(f"F1 Score: {f1}")
 
-        mlflow.set_experiment("network-anomaly-detector")
+
         with mlflow.start_run(run_name="EnsembleModel_Evaluation"):
+            
             mlflow.log_metric("f1_score", f1)
-            mlflow.log_dict(conf_report_dict, "classification_report.json")
+            mlflow.log_dict(class_report_dict, "classification_report.json")
             mlflow.log_dict({"confusion_matrix": conf_matrix.tolist()}, "confusion_matrix.json")
-        return conf_report_dict, conf_matrix
+            
+        return class_report_dict, conf_matrix
     
 
 if __name__ == "__main__":
-    if not all(path.exists() for path in [X_TEST_PATH, Y_TEST_PATH]):
-        raise FileNotFoundError("One or more test data files are missing. Please run the preprocessing step to generate the required files.")
+
 
     X_test, y_test = load_data()
 

@@ -6,7 +6,8 @@ from sklearn.ensemble import IsolationForest
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
-logger = logging.getLogger(__name__)    
+logger = logging.getLogger(__name__) 
+mlflow.set_experiment("network-anomaly-detector")   
 
 
 BASE_DIR = Path(__file__).parent.parent
@@ -30,8 +31,10 @@ def load_data():
     benign_traffic = X_train[y_train == 0]
     logger.info(f"Extracted benign traffic with shape {benign_traffic.shape}")
 
-    joblib.dump(benign_traffic, MODELS_DIR / "iforest_production_benign_traffic.npy")
-    joblib.dump(benign_labels, MODELS_DIR / "iforest_production_benign_labels.npy")
+
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    np.save(MODELS_DIR / "iforest_production_benign_traffic.npy", benign_traffic)
+    np.save(MODELS_DIR / "iforest_production_benign_labels.npy", benign_labels)
     logger.info(f"Saved benign traffic and labels for Isolation Forest training.")
     
     return X_train, y_train, benign_traffic, benign_labels
@@ -51,7 +54,6 @@ def train_isolation_forest(y_train, benign_traffic):
     iforest_production_model.fit(benign_traffic)
 
  # MLFlow tracking
-    mlflow.set_experiment("network-anomaly-detector")
     with mlflow.start_run(run_name="IsolationForest_production",):
         mlflow.log_param("n_estimators", 100)
         mlflow.log_param("random_state", 42)

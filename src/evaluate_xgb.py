@@ -8,6 +8,7 @@ import mlflow
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
+mlflow.set_experiment("network-anomaly-detector")
 BASE_DIR = Path(__file__).parent.parent
 PROCESSED_DATA_DIR = BASE_DIR / "data" / "processed"
 XGB_MODEL_DIR = BASE_DIR / "models" / "xgb_production_model.pkl"
@@ -36,12 +37,14 @@ def evaluate_model(xgb_production_model, X_test, y_test):
     conf_matrix = confusion_matrix(y_test, y_pred)
 
     # MLFlow tracking
-    mlflow.set_experiment("network-anomaly-detector")
+    
 
     with mlflow.start_run(run_name="XGBoost_production",):
         mlflow.log_metric("f1_score", f1)
         mlflow.log_metric("precision", classification_report_dict['macro avg']['precision'])
         mlflow.log_metric("recall", classification_report_dict['macro avg']['recall'])
+        mlflow.log_dict(classification_report_dict, "classification_report.json")
+        mlflow.log_dict({"confusion_matrix": conf_matrix.tolist()}, "confusion_matrix.json")
         
 
     logger.info(f"F1 Score: {f1:.4f}")
