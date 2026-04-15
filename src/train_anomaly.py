@@ -29,6 +29,10 @@ def load_data():
     logger.info(f"Extracted benign labels with shape {benign_labels.shape}")
     benign_traffic = X_train[y_train == 0]
     logger.info(f"Extracted benign traffic with shape {benign_traffic.shape}")
+
+    joblib.dump(benign_traffic, MODELS_DIR / "iforest_production_benign_traffic.npy")
+    joblib.dump(benign_labels, MODELS_DIR / "iforest_production_benign_labels.npy")
+    logger.info(f"Saved benign traffic and labels for Isolation Forest training.")
     
     return X_train, y_train, benign_traffic, benign_labels
 
