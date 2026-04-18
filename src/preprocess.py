@@ -5,6 +5,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 import joblib
 from sklearn.model_selection import train_test_split
 import numpy as np
+import json, os
 
 # log1p transformation removed — primary model (XGBoost) is tree-based and 
 # unaffected by rescaling features that preserve their order. StandardScaler applied downstream.
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 RAW_DATA_DIR = Path(__file__).parent.parent / "data" / "raw"
 PROCESSED_DATA_DIR = Path(__file__).parent.parent / "data" / "processed"
 MODELS_DIR = Path(__file__).parent.parent / "models"
+ARTIFACTS_DIR = Path(__file__).parent.parent / "artifacts"
 DUPLICATE_COLUMN = "Fwd Header Length.1"  # Column from preprocessing notebook that is duplicated in the dataset
 THRESHOLD_FOR_CORRELATION = 0.95
 WEB_ATTACK_LABEL_FIXES = {
@@ -175,4 +177,12 @@ if __name__ == "__main__":
     X_train_scaled, X_test_scaled = scale_features(X_train, X_test)
     logger.info("Data preprocessing completed successfully.")
 
-    
+    os.makedirs("artifacts", exist_ok=True)
+
+    # Save feature names
+    feature_names = X_train.columns.tolist()  # before .values / np.save
+    with open(ARTIFACTS_DIR / "feature_names.json", "w") as f:
+        json.dump(feature_names, f)
+
+    logger.info("Saved feature names to artifacts/feature_names.json")
+        
