@@ -46,12 +46,17 @@ def load_models_and_artifacts():
 
 def prepare_input_data(record, feature_names):
     input_data = []
-    record_dict = record.model_dump(by_alias=True)
+    record_by_alias = record.model_dump(by_alias=True)
+    record_by_field = record.model_dump()
+
     for feature in feature_names:
-        if feature not in record_dict:
-            raise ValueError(f"Missing feature: {feature}")
+        if feature in record_by_alias:
+            input_data.append(record_by_alias[feature])
+        elif feature.replace(' ', '_') in record_by_field:
+            input_data.append(record_by_field[feature.replace(' ', '_')])
         else:
-            input_data.append(record_dict.get(feature))
+            raise ValueError(f"Missing feature: {feature}")
+
     logger.info(f"Prepared input data for prediction successfully")
     return np.array(input_data).reshape(1, -1)
 
@@ -76,16 +81,8 @@ def predict_anomaly(input_array, iforest_model):
         logger.error(f"Error during anomaly detection: {e}")
         raise e
     
-def predict_ensemble(record, feature_names, iforest_model, label_encoder, scaler, xgb_model):
-    input_array = prepare_input_data(record, feature_names)
-    input_array_scaled = scaler.transform(input_array)
-    logger.info(f"Input data scaled successfully")
-    logger.info(f"Running Isolation Forest for anomaly detection")
-    
+def predict_ensemble(input_array_scaled, iforest_model, xgb_model, label_encoder):
     anomaly_response = predict_anomaly(input_array_scaled, iforest_model)
     is_anomaly = anomaly_response.anomaly_flagged
     classify_response = predict_classify(input_array_scaled, xgb_model, label_encoder)
-    predicted_label = classify_response.prediction
-    confidence = classify_response.confidence
-    
-    return PredictionResponse(prediction=predicted_label, confidence=confidence, anomaly_flagged=is_anomaly)
+    return PredictionResponse(prediction=classify_response.prediction, confidence=classify_response.confidence, anomaly_flagged=is_anomaly)
