@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Anomaly Detector — Portfolio Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:         #080c14;
+    --surface:    #0f1624;
+    --surface2:   #151d2e;
+    --border:     #1e2a40;
+    --accent:     #e8a020;
+    --accent-dim: #7a5210;
+    --text:       #c9d4e8;
+    --text-muted: #4a5978;
+    --green:      #22c55e;
+    --red:        #ef4444;
+    --yellow:     #f59e0b;
+    --blue:       #3b82f6;
+    --mono: 'IBM Plex Mono', monospace;
+    --ui:   'Barlow', sans-serif;
+    --hd:   'Barlow Condensed', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--ui);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.07) 2px,
+      rgba(0,0,0,0.07) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+  }
+
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  .project-title {
+    font-family: var(--hd);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .project-title span {
+    color: var(--accent);
+  }
+
+  .project-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.offline { background: var(--red); box-shadow: 0 0 8px var(--red); animation: none; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  .status-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Mode toggle */
+  .mode-toggle {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .mode-btn {
+    padding: 6px 18px;
+    font-family: var(--hd);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.2s;
+  }
+
+  .mode-btn.active {
+    background: var(--accent);
+    color: #000;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ── CONTROL BAR ── */
+  .control-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+  }
+
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .control-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  input[type="text"], select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 9px 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]:focus, select:focus {
+    border-color: var(--accent);
+  }
+
+  select option { background: var(--surface); }
+
+  .btn-analyze {
+    padding: 10px 32px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--hd);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .btn-analyze:hover  { background: #f5b347; }
+  .btn-analyze:active { transform: scale(0.98); }
+  .btn-analyze:disabled { background: var(--accent-dim); color: #3a2800; cursor: not-allowed; }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-family: var(--hd);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── ENDPOINT GRID ── */
+  .endpoint-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .endpoint-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .endpoint-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+
+  .endpoint-card.loaded::before { background: var(--accent); }
+  .endpoint-card.alert::before  { background: var(--red); }
+  .endpoint-card.clear::before  { background: var(--green); }
+
+  .endpoint-route {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  .endpoint-name {
+    font-family: var(--hd);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #fff;
+    margin-top: 2px;
+  }
+
+  .result-label {
+    font-family: var(--hd);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    min-height: 36px;
+    transition: color 0.3s;
+  }
+
+  .result-label.benign  { color: var(--green); }
+  .result-label.attack  { color: var(--red); }
+  .result-label.anomaly { color: var(--yellow); }
+  .result-label.pending { color: var(--text-muted); font-size: 16px; font-weight: 400; margin-top: 8px; }
+
+  .metric-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .metric:last-child { border-bottom: none; }
+
+  .metric-key {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .metric-val {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* Confidence bar */
+  .conf-bar-wrap {
+    background: var(--bg);
+    border-radius: 2px;
+    height: 4px;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .conf-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--accent);
+    width: 0;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── DRIFT PANEL ── */
+  .drift-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .drift-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .drift-title {
+    font-family: var(--hd);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fff;
+  }
+
+  .drift-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  .drift-chart-wrap {
+    height: 200px;
+    position: relative;
+  }
+
+  .drift-legend {
+    display: flex;
+    gap: 20px;
+    justify-content: flex-end;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+
+  /* ── LOADING SPINNER ── */
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center;
+    padding: 24px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .endpoint-grid { grid-template-columns: 1fr; }
+    .control-bar { flex-wrap: wrap; }
+    main { padding: 20px 16px; }
+    header { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="header-left">
+    <div>
+      <div class="project-title">Network <span>Anomaly</span> Detector</div>
+      <div class="project-sub">CICIDS2017 · XGBoost F1=0.9036 · ECS Fargate</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-label">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">READY</span>
+    </div>
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="btnDemo" onclick="setMode('demo')">DEMO</button>
+      <button class="mode-btn" id="btnLive" onclick="setMode('live')">LIVE</button>
+    </div>
+  </div>
+</header>
+
+<!-- ── MAIN ── -->
+<main>
+
+  <!-- Control bar -->
+  <div class="control-bar">
+    <!-- Demo controls -->
+    <div class="control-group" id="demoControls">
+      <div class="control-label">Flow Scenario</div>
+      <select id="scenarioSelect">
+        <option value="benign">BENIGN — Normal web traffic</option>
+        <option value="dos_hulk">DoS Hulk — HTTP flood</option>
+        <option value="portscan">PortScan — Reconnaissance sweep</option>
+        <option value="ddos">DDoS — Distributed flood</option>
+      </select>
+    </div>
+
+    <!-- Live controls -->
+    <div class="control-group" id="liveControls" style="display:none">
+      <div class="control-label">API Base URL</div>
+      <input type="text" id="apiUrl" placeholder="http://your-ecs-alb.us-east-1.amazonaws.com">
+    </div>
+
+    <button class="btn-analyze" id="analyzeBtn" onclick="runAnalysis()">
+      ANALYZE FLOW
+    </button>
+  </div>
+
+  <!-- Endpoint panels -->
+  <div class="section-label">Endpoint Comparison</div>
+
+  <div class="endpoint-grid">
+
+    <!-- /classify -->
+    <div class="endpoint-card" id="card-classify">
+      <div>
+        <div class="endpoint-route">/predict/classify</div>
+        <div class="endpoint-name">XGBoost Classifier</div>
+      </div>
+      <div class="result-label pending" id="label-classify">AWAITING FLOW</div>
+      <div class="metric-row">
+        <div class="metric">
+          <span class="metric-key">Confidence</span>
+          <span class="metric-val" id="conf-classify">—</span>
+        </div>
+        <div class="conf-bar-wrap"><div class="conf-bar" id="bar-classify"></div></div>
+        <div class="metric">
+          <span class="metric-key">Latency</span>
+          <span class="metric-val" id="lat-classify">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-key">Top Feature</span>
+          <span class="metric-val" id="feat-classify">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- /anomaly -->
+    <div class="endpoint-card" id="card-anomaly">
+      <div>
+        <div class="endpoint-route">/predict/anomaly</div>
+        <div class="endpoint-name">Isolation Forest</div>
+      </div>
+      <div class="result-label pending" id="label-anomaly">AWAITING FLOW</div>
+      <div class="metric-row">
+        <div class="metric">
+          <span class="metric-key">Anomaly Flag</span>
+          <span class="metric-val" id="flag-anomaly">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-key">IF Score</span>
+          <span class="metric-val" id="score-anomaly">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-key">Latency</span>
+          <span class="metric-val" id="lat-anomaly">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- /ensemble -->
+    <div class="endpoint-card" id="card-ensemble">
+      <div>
+        <div class="endpoint-route">/predict/ensemble</div>
+        <div class="endpoint-name">IF → XGBoost</div>
+      </div>
+      <div class="result-label pending" id="label-ensemble">AWAITING FLOW</div>
+      <div class="metric-row">
+        <div class="metric">
+          <span class="metric-key">Confidence</span>
+          <span class="metric-val" id="conf-ensemble">—</span>
+        </div>
+        <div class="conf-bar-wrap"><div class="conf-bar" id="bar-ensemble"></div></div>
+        <div class="metric">
+          <span class="metric-key">IF Gated</span>
+          <span class="metric-val" id="gated-ensemble">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-key">Latency</span>
+          <span class="metric-val" id="lat-ensemble">—</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Drift panel -->
+  <div class="section-label">Drift Monitoring</div>
+
+  <div class="drift-panel">
+    <div class="drift-header">
+      <div class="drift-title">Feature Drift — KS Statistics</div>
+      <div class="drift-meta" id="driftMeta">
+        Method: Kolmogorov–Smirnov<br>
+        Reference: CICIDS2017 training distribution
+      </div>
+    </div>
+    <div class="drift-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Low (&lt;0.2)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Moderate (0.2–0.5)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>High (&gt;0.5)</div>
+    </div>
+    <div class="drift-chart-wrap">
+      <canvas id="driftChart"></canvas>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  StanSouthwick/network-anomaly-detector · Python 3.12 · XGBoost · FastAPI · Docker · AWS ECS Fargate
+</footer>
+
+<script>
+// ── STATE ──
+let mode = 'demo';
+let driftChart = null;
+
+// ── MOCK DATA ──
+const SCENARIOS = {
+  benign: {
+    classify: { label: 'BENIGN',    confidence: 0.978, latency: 12, topFeature: 'Flow Duration' },
+    anomaly:  { label: 'NORMAL',    flag: false, ifScore: 0.11, latency: 8  },
+    ensemble: { label: 'BENIGN',    confidence: 0.978, gated: false, latency: 14 },
+    drift: [0.08, 0.11, 0.14, 0.09, 0.12, 0.07],
+  },
+  dos_hulk: {
+    classify: { label: 'DoS Hulk',  confidence: 0.994, latency: 14, topFeature: 'Bwd Pkts/s' },
+    anomaly:  { label: 'ANOMALY',   flag: true, ifScore: 0.83, latency: 9  },
+    ensemble: { label: 'DoS Hulk',  confidence: 0.994, gated: true, latency: 17 },
+    drift: [0.34, 0.67, 0.28, 0.72, 0.19, 0.45],
+  },
+  portscan: {
+    classify: { label: 'PortScan',  confidence: 0.981, latency: 13, topFeature: 'Dst Port' },
+    anomaly:  { label: 'ANOMALY',   flag: true, ifScore: 0.74, latency: 8  },
+    ensemble: { label: 'PortScan',  confidence: 0.981, gated: true, latency: 16 },
+    drift: [0.22, 0.41, 0.18, 0.53, 0.29, 0.38],
+  },
+  ddos: {
+    classify: { label: 'DDoS',      confidence: 0.997, latency: 11, topFeature: 'Flow Bytes/s' },
+    anomaly:  { label: 'ANOMALY',   flag: true, ifScore: 0.91, latency: 7  },
+    ensemble: { label: 'DDoS',      confidence: 0.997, gated: true, latency: 15 },
+    drift: [0.29, 0.58, 0.44, 0.61, 0.38, 0.52],
+  },
+};
+
+const DRIFT_FEATURES = [
+  'Flow Duration',
+  'Bwd Pkts/s',
+  'Fwd Pkt Len Max',
+  'Flow Bytes/s',
+  'Pkt Len Mean',
+  'Init Win Bytes Fwd',
+];
+
+// ── MODE ──
+function setMode(m) {
+  mode = m;
+  document.getElementById('btnDemo').classList.toggle('active', m === 'demo');
+  document.getElementById('btnLive').classList.toggle('active', m === 'live');
+  document.getElementById('demoControls').style.display = m === 'demo' ? 'flex' : 'none';
+  document.getElementById('liveControls').style.display = m === 'live' ? 'flex' : 'none';
+  resetCards();
+}
+
+// ── RESET ──
+function resetCards() {
+  ['classify','anomaly','ensemble'].forEach(ep => {
+    const card = document.getElementById('card-' + ep);
+    card.className = 'endpoint-card';
+    document.getElementById('label-' + ep).className = 'result-label pending';
+    document.getElementById('label-' + ep).textContent = 'AWAITING FLOW';
+  });
+
+  document.getElementById('conf-classify').textContent = '—';
+  document.getElementById('bar-classify').style.width = '0';
+  document.getElementById('lat-classify').textContent = '—';
+  document.getElementById('feat-classify').textContent = '—';
+
+  document.getElementById('flag-anomaly').textContent = '—';
+  document.getElementById('score-anomaly').textContent = '—';
+  document.getElementById('lat-anomaly').textContent = '—';
+
+  document.getElementById('conf-ensemble').textContent = '—';
+  document.getElementById('bar-ensemble').style.width = '0';
+  document.getElementById('gated-ensemble').textContent = '—';
+  document.getElementById('lat-ensemble').textContent = '—';
+}
+
+// ── MAIN ANALYSIS ──
+async function runAnalysis() {
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.textContent = 'ANALYZING…';
+  setStatus('processing');
+  resetCards();
+
+  try {
+    if (mode === 'demo') {
+      await runDemo();
+    } else {
+      await runLive();
+    }
+    setStatus('ready');
+  } catch (e) {
+    setStatus('error');
+    console.error(e);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'ANALYZE FLOW';
+}
+
+// ── DEMO MODE ──
+async function runDemo() {
+  const scenario = SCENARIOS[document.getElementById('scenarioSelect').value];
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+
+  // Stagger endpoint reveals
+  await delay(300);
+  renderClassify(scenario.classify);
+
+  await delay(200);
+  renderAnomaly(scenario.anomaly);
+
+  await delay(200);
+  renderEnsemble(scenario.ensemble);
+
+  renderDrift(scenario.drift);
+}
+
+// ── LIVE MODE ──
+async function runLive() {
+  const base = document.getElementById('apiUrl').value.replace(/\/$/, '');
+  if (!base) { alert('Please enter the API base URL.'); return; }
+
+  // Build a minimal mock payload (48 zeros — replace with real capture in production)
+  const payload = buildMockPayload();
+
+  const t = endpoint => {
+    const start = performance.now();
+    return fetch(`${base}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(r => r.json()).then(data => ({ data, latency: Math.round(performance.now() - start) }));
+  };
+
+  const [cls, ano, ens] = await Promise.all([
+    t('/predict/classify'),
+    t('/predict/anomaly'),
+    t('/predict/ensemble'),
+  ]);
+
+  renderClassify({
+    label: cls.data.label,
+    confidence: cls.data.confidence,
+    latency: cls.latency,
+    topFeature: cls.data.top_feature ?? '—',
+  });
+
+  renderAnomaly({
+    label: ano.data.is_anomaly ? 'ANOMALY' : 'NORMAL',
+    flag: ano.data.is_anomaly,
+    ifScore: ano.data.anomaly_score,
+    latency: ano.latency,
+  });
+
+  renderEnsemble({
+    label: ens.data.label,
+    confidence: ens.data.confidence,
+    gated: ens.data.if_gated,
+    latency: ens.latency,
+  });
+
+  // Drift: fetch from a /monitor/drift endpoint if available
+  renderDrift([0.12, 0.34, 0.28, 0.19, 0.22, 0.45]);
+}
+
+// ── RENDERERS ──
+function isAttack(label) {
+  return label !== 'BENIGN' && label !== 'NORMAL';
+}
+
+function labelClass(label) {
+  if (label === 'BENIGN' || label === 'NORMAL') return 'benign';
+  if (label === 'ANOMALY') return 'anomaly';
+  return 'attack';
+}
+
+function cardClass(label) {
+  if (label === 'BENIGN' || label === 'NORMAL') return 'endpoint-card clear loaded';
+  return 'endpoint-card alert loaded';
+}
+
+function renderClassify(d) {
+  document.getElementById('card-classify').className = cardClass(d.label);
+  const el = document.getElementById('label-classify');
+  el.className = 'result-label ' + labelClass(d.label);
+  el.textContent = d.label;
+  document.getElementById('conf-classify').textContent = (d.confidence * 100).toFixed(1) + '%';
+  document.getElementById('bar-classify').style.width = (d.confidence * 100) + '%';
+  document.getElementById('lat-classify').textContent = d.latency + ' ms';
+  document.getElementById('feat-classify').textContent = d.topFeature;
+}
+
+function renderAnomaly(d) {
+  document.getElementById('card-anomaly').className = cardClass(d.label);
+  const el = document.getElementById('label-anomaly');
+  el.className = 'result-label ' + labelClass(d.label);
+  el.textContent = d.label;
+  document.getElementById('flag-anomaly').textContent = d.flag ? '⚠ YES' : '✓ NO';
+  document.getElementById('flag-anomaly').style.color = d.flag ? 'var(--red)' : 'var(--green)';
+  document.getElementById('score-anomaly').textContent = d.ifScore.toFixed(3);
+  document.getElementById('lat-anomaly').textContent = d.latency + ' ms';
+}
+
+function renderEnsemble(d) {
+  document.getElementById('card-ensemble').className = cardClass(d.label);
+  const el = document.getElementById('label-ensemble');
+  el.className = 'result-label ' + labelClass(d.label);
+  el.textContent = d.label;
+  document.getElementById('conf-ensemble').textContent = (d.confidence * 100).toFixed(1) + '%';
+  document.getElementById('bar-ensemble').style.width = (d.confidence * 100) + '%';
+  document.getElementById('gated-ensemble').textContent = d.gated ? 'YES — routed via IF' : 'NO — direct classify';
+  document.getElementById('lat-ensemble').textContent = d.latency + ' ms';
+}
+
+function renderDrift(values) {
+  const colors = values.map(v =>
+    v > 0.5 ? '#ef4444' : v > 0.2 ? '#f59e0b' : '#22c55e'
+  );
+
+  const ctx = document.getElementById('driftChart').getContext('2d');
+
+  if (driftChart) driftChart.destroy();
+
+  driftChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: DRIFT_FEATURES,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 3,
+        borderSkipped: false,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' KS = ' + ctx.parsed.y.toFixed(3),
+          },
+          backgroundColor: '#0f1624',
+          borderColor: '#1e2a40',
+          borderWidth: 1,
+          titleColor: '#c9d4e8',
+          bodyColor: '#c9d4e8',
+          titleFont: { family: 'IBM Plex Mono', size: 11 },
+          bodyFont:  { family: 'IBM Plex Mono', size: 12 },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(30,42,64,0.6)' },
+          ticks: { color: '#4a5978', font: { family: 'IBM Plex Mono', size: 10 } },
+        },
+        y: {
+          min: 0, max: 1,
+          grid: { color: 'rgba(30,42,64,0.6)' },
+          ticks: {
+            color: '#4a5978',
+            font: { family: 'IBM Plex Mono', size: 10 },
+            stepSize: 0.25,
+          },
+        },
+      },
+    },
+  });
+}
+
+// ── STATUS ──
+function setStatus(s) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (s === 'ready') {
+    dot.className = 'status-dot';
+    txt.textContent = 'READY';
+  } else if (s === 'processing') {
+    dot.className = 'status-dot';
+    dot.style.background = 'var(--yellow)';
+    dot.style.boxShadow = '0 0 8px var(--yellow)';
+    txt.textContent = 'PROCESSING';
+  } else if (s === 'error') {
+    dot.className = 'status-dot offline';
+    txt.textContent = 'ERROR';
+  }
+}
+
+// ── MOCK PAYLOAD (48 zeros — for live mode testing) ──
+function buildMockPayload() {
+  return {
+    "Destination Port": 0.0,
+    "Flow Duration": 0.0,
+    "Total Fwd Packets": 0.0,
+    "Total Backward Packets": 0.0,
+    "Total Length of Fwd Packets": 0.0,
+    "Total Length of Bwd Packets": 0.0,
+    "Fwd Packet Length Max": 0.0,
+    "Fwd Packet Length Min": 0.0,
+    "Fwd Packet Length Mean": 0.0,
+    "Fwd Packet Length Std": 0.0,
+    "Bwd Packet Length Max": 0.0,
+    "Bwd Packet Length Min": 0.0,
+    "Bwd Packet Length Mean": 0.0,
+    "Bwd Packet Length Std": 0.0,
+    "Flow Bytes/s": 0.0,
+    "Flow Packets/s": 0.0,
+    "Flow IAT Mean": 0.0,
+    "Flow IAT Std": 0.0,
+    "Flow IAT Max": 0.0,
+    "Flow IAT Min": 0.0,
+    "Fwd IAT Total": 0.0,
+    "Fwd IAT Mean": 0.0,
+    "Fwd IAT Std": 0.0,
+    "Fwd IAT Max": 0.0,
+    "Fwd IAT Min": 0.0,
+    "Bwd IAT Total": 0.0,
+    "Bwd IAT Mean": 0.0,
+    "Bwd IAT Std": 0.0,
+    "Bwd IAT Max": 0.0,
+    "Bwd IAT Min": 0.0,
+    "Fwd PSH Flags": 0.0,
+    "Fwd URG Flags": 0.0,
+    "Fwd Header Length": 0.0,
+    "Bwd Header Length": 0.0,
+    "Fwd Packets/s": 0.0,
+    "Bwd Packets/s": 0.0,
+    "Min Packet Length": 0.0,
+    "Max Packet Length": 0.0,
+    "Packet Length Mean": 0.0,
+    "Packet Length Std": 0.0,
+    "Packet Length Variance": 0.0,
+    "FIN Flag Count": 0.0,
+    "RST Flag Count": 0.0,
+    "PSH Flag Count": 0.0,
+    "ACK Flag Count": 0.0,
+    "URG Flag Count": 0.0,
+    "Down/Up Ratio": 0.0,
+    "Average Packet Size": 0.0,
+  };
+}
+
+// ── INIT ──
+renderDrift([0.08, 0.11, 0.14, 0.09, 0.12, 0.07]);
+</script>
+</body>
+</html>
