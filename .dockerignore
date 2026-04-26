@@ -1,0 +1,29 @@
+#Raw data
+data/
+
+#Models and artifcats
+models/
+artifacts/
+
+#Notebooks
+notebooks/
+
+#MLflow
+mlruns/
+
+#Enviorments
+.env
+*.env
+
+#VSCode
+.vscode/
+
+#Python cache
+__pycache__
+*.pyc
+
+#Git history
+.git/
+
+#macOS
+.DS_Store
