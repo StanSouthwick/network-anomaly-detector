@@ -3,6 +3,14 @@ from fastapi import FastAPI
 import logging
 from src.api.predict import load_models_and_artifacts, predict_classify, predict_anomaly, predict_ensemble, prepare_input_data
 from src.api.schemas import PredictionResponse, FlowRecord, BatchRequest, BatchResponse
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["POST"],
+    allow_headers=["Content-Type"],
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +28,13 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down the application...")
 
 app = FastAPI(title="Network Anomaly Detector API", version="1.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["POST"],
+    allow_headers=["Content-Type"],
+)
 
 # Define API endpoints for anomaly detection, classification, ensemble prediction, batch prediction, and health check
 @app.post("/predict/anomaly", response_model=PredictionResponse)
@@ -49,6 +64,7 @@ async def batch_predict(request: BatchRequest):
         response = predict_ensemble(input_array_scaled, app.state.iforest_model, app.state.xgb_model, app.state.label_encoder)
         responses.append(response)
     return BatchResponse(predictions=responses)
+
 
 @app.get("/health")
 async def health_check():
