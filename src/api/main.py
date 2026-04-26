@@ -7,7 +7,7 @@ from src.api.schemas import PredictionResponse, FlowRecord, BatchRequest, BatchR
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
-
+ # Lifespan function to load models and artifacts at application startup and clean up at shutdown
 async def lifespan(app: FastAPI):
     logger.info("Starting up the application and loading models/artifacts...")
     feature_names, iforest_model, label_encoder, scaler, xgb_model = load_models_and_artifacts()
@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Network Anomaly Detector API", version="1.0", lifespan=lifespan)
 
+# Define API endpoints for anomaly detection, classification, ensemble prediction, batch prediction, and health check
 @app.post("/predict/anomaly", response_model=PredictionResponse)
 async def predict_anomaly_endpoint(request: FlowRecord):
     input_array = prepare_input_data(request, app.state.feature_names)

@@ -8,6 +8,7 @@ from src.api.schemas import PredictionResponse
 logger = logging.getLogger(__name__)
 s3 = boto3.client('s3')
 
+# Constants for S3 bucket and artifact keys
 BUCKET = 'network-anomaly-detector-artifacts'
 FEATURE_NAMES = 'artifacts/feature_names.json'
 IFOREST_MODEL = 'models/iforest_production_model.pkl'
@@ -16,6 +17,7 @@ SCALER = 'models/network_data_scaler_production.joblib'
 XGB_MODEL = 'models/xgb_production_model.pkl'
 LOCAL_PATH = '/tmp/'
 
+# Utility functions for loading models/artifacts and making predictions
 def load_artifact_from_s3(bucket, key, local_path, model_name):
     local_file_path = local_path + key.split('/')[-1]
     try:
@@ -32,7 +34,8 @@ def load_artifact_from_s3(bucket, key, local_path, model_name):
     except Exception as e:
         logger.error(f"Error downloading {key} from S3 bucket {bucket}: {e}")
         raise e
-    
+
+# Functions for preparing input data and making predictions
 def load_models_and_artifacts():
     logger.info("Loading models and artifacts from S3...")
     feature_names = load_artifact_from_s3(BUCKET, FEATURE_NAMES, LOCAL_PATH, "Feature Names")
@@ -44,6 +47,7 @@ def load_models_and_artifacts():
     
     return feature_names, iforest_model, label_encoder, scaler, xgb_model
 
+# Function to prepare input data for prediction, ensuring correct feature order and handling aliases
 def prepare_input_data(record, feature_names):
     input_data = []
     record_by_alias = record.model_dump(by_alias=True)
@@ -60,6 +64,7 @@ def prepare_input_data(record, feature_names):
     logger.info(f"Prepared input data for prediction successfully")
     return np.array(input_data).reshape(1, -1)
 
+# Prediction functions for classification, anomaly detection, and ensemble prediction
 def predict_classify(input_array, xgb_model, label_encoder):
     try:
         prediction = xgb_model.predict(input_array)[0]
@@ -70,7 +75,8 @@ def predict_classify(input_array, xgb_model, label_encoder):
     except Exception as e:
         logger.error(f"Error during prediction: {e}")
         raise e
-    
+
+# Anomaly detection function using Isolation Forest, returning a PredictionResponse with anomaly flag
 def predict_anomaly(input_array, iforest_model):
     try:
         anomaly_score = iforest_model.decision_function(input_array)[0]
@@ -80,7 +86,9 @@ def predict_anomaly(input_array, iforest_model):
     except Exception as e:
         logger.error(f"Error during anomaly detection: {e}")
         raise e
-    
+
+# Ensemble prediction function that combines results from both anomaly detection and classification, 
+# returning a PredictionResponse with the final prediction, confidence, and anomaly flag
 def predict_ensemble(input_array_scaled, iforest_model, xgb_model, label_encoder):
     anomaly_response = predict_anomaly(input_array_scaled, iforest_model)
     is_anomaly = anomaly_response.anomaly_flagged
