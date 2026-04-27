@@ -217,10 +217,11 @@ Example response:
 
 `src/monitor/drift.py` computes per-feature Kolmogorov–Smirnov statistics between the CICIDS2017 training distribution and incoming inference traffic. Results are logged to MLflow. Thresholds: KS > 0.5 triggers a high-drift alert; 0.2–0.5 is moderate.
 
-The portfolio dashboard (`dashboard.html`) visualises current KS statistics per feature with colour-coded severity.
+## Dashboard 
 
 The live mode requires the current ECS task public IP, which changes on each deployment. Find it in the ECS console: Clusters → network-anomaly-detector → Tasks → running task → Public IP. Enter it as http://<ip>:8000.
 
+The portfolio dashboard (`dashboard.html`) visualises current KS statistics per feature with colour-coded severity.
 ---
 
 ## Data
