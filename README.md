@@ -219,6 +219,8 @@ Example response:
 
 The portfolio dashboard (`dashboard.html`) visualises current KS statistics per feature with colour-coded severity.
 
+The live mode requires the current ECS task public IP, which changes on each deployment. Find it in the ECS console: Clusters → network-anomaly-detector → Tasks → running task → Public IP. Enter it as http://<ip>:8000.
+
 ---
 
 ## Data
